@@ -1,6 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
-import { Rewind, SkipBack, SkipForward, FastForward, Play, Pause, ChevronDown } from 'lucide-react';
+import { Rewind, SkipBack, SkipForward, FastForward, Play, Pause } from 'lucide-react';
+
+// --- Import New Components ---
+import AnimatedList from './components/AnimatedList';
+import Counter from './components/Counter';
+import Dock from './components/Dock';
 
 // --- Main App Component ---
 export default function App() {
@@ -21,17 +26,15 @@ root.left.right = TreeNode(3)
 root.right.left = TreeNode(6)
 root.right.right = TreeNode(9)
 
+traversal_result = []
 # In-order traversal
 def inorder_traversal(node):
-    result = []
     if node:
-        result.extend(inorder_traversal(node.left))
-        result.append(node.val)
-        result.extend(inorder_traversal(node.right))
-    return result
+        inorder_traversal(node.left)
+        traversal_result.append(node.val)
+        inorder_traversal(node.right)
 
-traversal_result = inorder_traversal(root)
-print(traversal_result)
+inorder_traversal(root)
 `
   );
   const [language, setLanguage] = useState('python');
@@ -40,6 +43,7 @@ print(traversal_result)
   const [isLoading, setIsLoading] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState(1000);
+  const [isStepListOpen, setIsStepListOpen] = useState(false);
   const intervalRef = useRef(null);
   const editorRef = useRef(null);
   const monacoRef = useRef(null);
@@ -114,6 +118,14 @@ print(traversal_result)
     }
     setIsPlaying(!isPlaying);
   };
+  
+  const dockItems = [
+    { icon: <Rewind size={20} />, label: 'First', onClick: () => handleStep(0) },
+    { icon: <SkipBack size={20} />, label: 'Previous', onClick: () => handleStep(currentStep - 1) },
+    { icon: isPlaying ? <Pause size={20} /> : <Play size={20} />, label: isPlaying ? 'Pause' : 'Play', onClick: togglePlayPause },
+    { icon: <SkipForward size={20} />, label: 'Next', onClick: () => handleStep(currentStep + 1) },
+    { icon: <FastForward size={20} />, label: 'Last', onClick: () => handleStep(trace.length - 1) },
+  ];
 
   return (
     <div className="bg-gray-900 text-white h-screen w-screen overflow-hidden flex flex-col font-sans">
@@ -121,65 +133,60 @@ print(traversal_result)
         <h1 className="text-3xl md:text-4xl font-bold text-center text-purple-400">DSA Visualizer</h1>
         <p className="text-center text-gray-400 text-sm md:text-base">Visualize complex data structures and algorithms</p>
       </header>
-      <main className="flex-grow flex flex-col md:flex-row gap-2 md:gap-4 px-2 md:px-4 pb-2 md:pb-4 min-h-0">
-        {/* Editor Panel: Takes up half height on mobile, full height on desktop */}
+      
+      <main className="flex-grow flex flex-col md:flex-row gap-2 md:gap-4 px-2 md:px-4 pb-2 md:pb-28 min-h-0">
         <div className="w-full h-1/2 md:h-full md:w-1/2 flex flex-col rounded-lg shadow-2xl bg-gray-800">
           <div className="flex-shrink-0 flex justify-between items-center bg-gray-700 p-2 rounded-t-lg"><h2 className="text-lg font-semibold">Code Editor</h2><select value={language} onChange={(e) => setLanguage(e.target.value)} className="bg-gray-600 text-white p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"><option value="python">Python</option><option value="cpp" disabled>C++</option></select></div>
           <div className="flex-grow relative"><Editor className="absolute top-0 left-0 w-full h-full" language={language} theme="vs-dark" defaultValue={code} onMount={handleEditorDidMount} options={{ fontSize: 14, minimap: { enabled: false }, readOnly: isLoading }} /></div>
           <div className="flex-shrink-0 p-2 bg-gray-700 rounded-b-lg"><button onClick={visualizeCode} disabled={isLoading} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md transition duration-300 disabled:bg-gray-500">{isLoading ? 'Visualizing...' : 'Visualize'}</button></div>
         </div>
-        {/* Visualization Panel: Takes up half height on mobile, full height on desktop */}
         <div className="w-full h-1/2 md:h-full md:w-1/2 flex flex-col rounded-lg shadow-2xl bg-gray-800">
-          <div className="flex-shrink-0 bg-gray-700 p-2 rounded-t-lg"><h2 className="text-lg font-semibold">Visualization</h2></div>
-          <div className="p-2 md:p-4 flex-grow overflow-auto">{isLoading ? <div className="flex justify-center items-center h-full"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-purple-500"></div></div> : trace.length > 0 ? <VisualizationPanel step={trace[currentStep]} /> : <div className="text-center text-gray-400">Click "Visualize" to begin.</div>}</div>
-          {trace.length > 0 && !trace[0]?.error && (
-            <div className="flex-shrink-0 bg-gray-700 p-2 md:p-3 rounded-b-lg flex flex-col gap-2">
-                <div className="flex justify-center items-center gap-2 sm:gap-4">
-                    <ControlButton onClick={() => handleStep(0)} icon={<Rewind size={20} />} disabled={currentStep === 0} />
-                    <ControlButton onClick={() => handleStep(currentStep - 1)} icon={<SkipBack size={20} />} disabled={currentStep === 0} />
-                    <StepSelector currentStep={currentStep} totalSteps={trace.length} onStepSelect={handleStep} />
-                    <ControlButton onClick={() => handleStep(currentStep + 1)} icon={<SkipForward size={20} />} disabled={currentStep >= trace.length - 1} />
-                    <ControlButton onClick={() => handleStep(trace.length - 1)} icon={<FastForward size={20} />} disabled={currentStep >= trace.length - 1} />
+          <div className="flex-shrink-0 bg-gray-700 p-2 rounded-t-lg flex justify-between items-center"><h2 className="text-lg font-semibold">Visualization</h2>
+            {trace.length > 0 && !trace[0]?.error && (
+                <button onClick={() => setIsStepListOpen(!isStepListOpen)} className="font-mono text-sm bg-gray-900 border border-gray-600 px-3 py-1 rounded-md flex items-center gap-2 hover:bg-gray-700 transition-colors">
+                    Step 
+                    <Counter 
+                        value={currentStep + 1} 
+                        fontSize={14} 
+                        textColor="#e5e7eb"
+                        gradientFrom="rgba(31, 41, 55, 0)"
+                        gradientTo="rgba(31, 41, 55, 0)"
+                    /> 
+                    / {trace.length}
+                </button>
+            )}
+          </div>
+          <div className="p-2 md:p-4 flex-grow overflow-auto relative">
+            {isLoading ? <div className="flex justify-center items-center h-full"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-purple-500"></div></div> : trace.length > 0 ? <VisualizationPanel step={trace[currentStep]} /> : <div className="text-center text-gray-400">Click "Visualize" to begin.</div>}
+            {isStepListOpen && (
+                <div className="absolute inset-0 bg-gray-900/80 backdrop-blur-sm z-10 flex justify-center items-center" onClick={() => setIsStepListOpen(false)}>
+                    <AnimatedList 
+                        items={trace.map((_, i) => `Step ${i + 1}`)}
+                        onItemSelect={(_, index) => {
+                            handleStep(index);
+                            setIsStepListOpen(false);
+                        }}
+                        className="w-64 bg-gray-800 border border-gray-600 rounded-lg"
+                        itemClassName="bg-gray-700/50 hover:bg-gray-700"
+                    />
                 </div>
-                 <div className="flex items-center gap-2 sm:gap-3 px-1 sm:px-4">
-                    <ControlButton onClick={togglePlayPause} icon={isPlaying ? <Pause size={20} /> : <Play size={20} />} />
-                    <input type="range" min="100" max="2000" step="100" value={2100 - speed} onChange={(e) => setSpeed(2100 - e.target.value)} className="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-purple-500" />
-                    <span className="text-xs text-gray-400">{(speed/1000).toFixed(1)}s</span>
-                </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </main>
+      
+      {trace.length > 0 && !trace[0]?.error && (
+        <footer className="absolute bottom-0 left-0 right-0 flex flex-col items-center z-20">
+            <Dock items={dockItems} />
+            <div className="flex items-center gap-2 sm:gap-3 px-1 sm:px-4 w-full max-w-xs mb-2">
+                <input type="range" min="100" max="2000" step="100" value={2100 - speed} onChange={(e) => setSpeed(2100 - e.target.value)} className="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-purple-500" />
+                <span className="text-xs w-10 text-center font-mono">{(speed/1000).toFixed(1)}s</span>
+            </div>
+        </footer>
+      )}
     </div>
   );
 }
-
-// --- Step Selector Dropdown Component ---
-const StepSelector = ({ currentStep, totalSteps, onStepSelect }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const wrapperRef = useRef(null);
-    useEffect(() => {
-        function handleClickOutside(event) {
-            if (wrapperRef.current && !wrapperRef.current.contains(event.target)) setIsOpen(false);
-        }
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, [wrapperRef]);
-    const handleSelect = (step) => { onStepSelect(step); setIsOpen(false); };
-    return (
-        <div className="relative" ref={wrapperRef}>
-            <button onClick={() => setIsOpen(!isOpen)} className="font-mono text-sm bg-gray-800 px-3 py-2 rounded-md flex items-center gap-2 hover:bg-gray-900 transition-colors">
-                <span>{currentStep + 1} / {totalSteps}</span>
-                <ChevronDown size={16} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-            </button>
-            {isOpen && (
-                <div className="absolute bottom-full mb-2 w-48 bg-gray-800 border border-gray-600 rounded-lg shadow-lg max-h-40 md:max-h-60 overflow-y-auto z-10">
-                    <ul className="p-1">{Array.from({ length: totalSteps }, (_, i) => (<li key={i}><button onClick={() => handleSelect(i)} className={`w-full text-left px-3 py-1 rounded-md text-sm font-mono ${currentStep === i ? 'bg-purple-600' : 'hover:bg-purple-800/50'}`}>Step {i + 1}</button></li>))}</ul>
-                </div>
-            )}
-        </div>
-    );
-};
 
 // --- Visualization Panel and Variable Rendering ---
 const VisualizationPanel = ({ step }) => {
@@ -304,5 +311,3 @@ const TreeDisplay = ({ node }) => {
         </div>
     );
 };
-
-const ControlButton = ({ onClick, icon, disabled }) => (<button onClick={onClick} disabled={disabled} className="p-2 rounded-full bg-purple-600 hover:bg-purple-500 disabled:bg-gray-600 disabled:text-gray-400 transition-all duration-200">{icon}</button>);
