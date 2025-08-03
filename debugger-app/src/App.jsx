@@ -9,35 +9,16 @@ import Dock from './components/Dock';
 
 // --- Main App Component ---
 export default function App() {
+  const [language, setLanguage] = useState('cpp');
   const [code, setCode] = useState(
-`# Definition for a binary tree node.
-class TreeNode:
-    def __init__(self, val=0, left=None, right=None):
-        self.val = val
-        self.left = left
-        self.right = right
+`#include <iostream>
 
-# Build a simple binary tree
-root = TreeNode(4)
-root.left = TreeNode(2)
-root.right = TreeNode(7)
-root.left.left = TreeNode(1)
-root.left.right = TreeNode(3)
-root.right.left = TreeNode(6)
-root.right.right = TreeNode(9)
-
-traversal_result = []
-# In-order traversal
-def inorder_traversal(node):
-    if node:
-        inorder_traversal(node.left)
-        traversal_result.append(node.val)
-        inorder_traversal(node.right)
-
-inorder_traversal(root)
+int main() {
+    // Start coding here!
+    return 0;
+}
 `
   );
-  const [language, setLanguage] = useState('python');
   const [trace, setTrace] = useState([]);
   const [currentStep, setCurrentStep] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -81,6 +62,7 @@ inorder_traversal(root)
   function handleEditorDidMount(editor, monaco) {
     editorRef.current = editor;
     monacoRef.current = monaco;
+    editor.setValue(code);
   }
 
   async function visualizeCode() {
@@ -136,14 +118,13 @@ inorder_traversal(root)
       
       <main className="flex-grow flex flex-col md:flex-row gap-2 md:gap-4 px-2 md:px-4 pb-2 md:pb-28 min-h-0">
         <div className="w-full h-1/2 md:h-full md:w-1/2 flex flex-col rounded-lg shadow-2xl bg-gray-800">
-          <div className="flex-shrink-0 flex justify-between items-center bg-gray-700 p-2 rounded-t-lg"><h2 className="text-lg font-semibold">Code Editor</h2><select value={language} onChange={(e) => setLanguage(e.target.value)} className="bg-gray-600 text-white p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"><option value="python">Python</option><option value="cpp" disabled>C++</option></select></div>
-          <div className="flex-grow relative"><Editor className="absolute top-0 left-0 w-full h-full" language={language} theme="vs-dark" defaultValue={code} onMount={handleEditorDidMount} options={{ fontSize: 14, minimap: { enabled: false }, readOnly: isLoading }} /></div>
+          <div className="flex-shrink-0 flex justify-between items-center bg-gray-700 p-2 rounded-t-lg"><h2 className="text-lg font-semibold">Code Editor</h2><select value={language} onChange={(e) => setLanguage(e.target.value)} className="bg-gray-600 text-white p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"><option value="python">Python</option><option value="cpp">C++</option></select></div>
+          <div className="flex-grow relative"><Editor key={language} className="absolute top-0 left-0 w-full h-full" language={language} defaultValue={code} onMount={handleEditorDidMount} options={{ fontSize: 14, minimap: { enabled: false }, readOnly: isLoading }} /></div>
           <div className="flex-shrink-0 p-2 bg-gray-700 rounded-b-lg"><button onClick={visualizeCode} disabled={isLoading} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md transition duration-300 disabled:bg-gray-500">{isLoading ? 'Visualizing...' : 'Visualize'}</button></div>
         </div>
         <div className="w-full h-1/2 md:h-full md:w-1/2 flex flex-col rounded-lg shadow-2xl bg-gray-800">
           <div className="flex-shrink-0 bg-gray-700 p-2 rounded-t-lg flex justify-between items-center"><h2 className="text-lg font-semibold">Visualization</h2>
             {trace.length > 0 && !trace[0]?.error && (
-                // --- FONT FIX: Apply font-mono to the entire button ---
                 <button onClick={() => setIsStepListOpen(!isStepListOpen)} className="font-mono text-sm bg-gray-900 border border-gray-600 px-3 py-1 rounded-md flex items-center gap-2 hover:bg-gray-700 transition-colors">
                     Step 
                     <Counter 
@@ -153,6 +134,7 @@ inorder_traversal(root)
                         gradientFrom="rgba(31, 41, 55, 0)"
                         gradientTo="rgba(31, 41, 55, 0)"
                     /> 
+                    / {trace.length}
                 </button>
             )}
           </div>
@@ -209,20 +191,41 @@ const VariableDisplay = ({ name, value }) => {
     if (val === null || typeof val !== 'object') return <div className="bg-gray-700 p-2 rounded-md text-lg font-mono">{String(val)}</div>;
     if (val._type === 'list' && val.values.length > 0 && val.values[0]?._type === 'list') { return <GridDisplay matrix={val.values} />; }
     switch (val._type) {
+      case 'string': return <StringDisplay str={val} />;
+      case 'vector': return <ListDisplay items={val.values} />;
+      case 'map': return <DictDisplay items={val.values} />;
+      case 'multimap': return <DictDisplay items={val.values} isMultimap={true} />;
+      case 'deque': return <ListDisplay items={val.values} />;
       case 'list': return <ListDisplay items={val.values} />;
+      case 'set': return <SetDisplay items={val.values} />;
+      case 'multiset': return <SetDisplay items={val.values} isMultiset={true} />;
+      case 'unordered_set': return <SetDisplay items={val.values} />;
+      case 'unordered_multiset': return <SetDisplay items={val.values} isMultiset={true} />;
+      case 'stack': return <ListDisplay items={val.values} />;
+      case 'queue': return <ListDisplay items={val.values} />;
+      case 'priority_queue': return <ListDisplay items={val.values} />;
+      case 'pair': return <PairDisplay item={val} />;
+      case 'tuple': return <TupleDisplay item={val} />;
+      case 'bitset': return <BitsetDisplay bits={val.values} />; // --- NEW CASE ---
       case 'dict': return <DictDisplay items={val.values} />;
       case 'function': return <FunctionDisplay func={val} />;
       case 'tree_node': return <div className="overflow-x-auto p-1"><TreeDisplay node={val} /></div>;
       case 'linked_list_node': return <div className="overflow-x-auto p-1"><LinkedListDisplay node={val} /></div>;
       case 'object': return <ObjectDisplay obj={val} />;
       case 'circular_ref': return <div className="text-sm text-gray-500 font-mono">Circular Reference</div>;
-      default: return <div className="bg-gray-700 p-2 rounded-md text-lg font-mono">{JSON.stringify(val)}</div>;
+      default: return <div className="bg-gray-700 p-2 rounded-md text-lg font-mono">{String(val)}</div>;
     }
   };
   return (<div><p className="font-mono text-purple-400 mb-1">{name}</p>{renderValue(value)}</div>);
 };
 
 // --- Data Structure Specific Components ---
+const StringDisplay = ({ str }) => (
+    <div className="bg-gray-700 p-2 rounded-md text-lg font-mono text-amber-300">
+        "{str.value}"
+    </div>
+);
+
 const ListDisplay = ({ items }) => (
   <div className="flex flex-wrap gap-1 bg-gray-900/50 p-2 rounded-md">
     {items.map((item, index) => (
@@ -233,6 +236,46 @@ const ListDisplay = ({ items }) => (
     ))}
   </div>
 );
+
+const SetDisplay = ({ items, isMultiset = false }) => (
+  <div className="flex flex-wrap gap-2 bg-gray-900/50 p-2 rounded-md">
+    {items.map((item, index) => (
+      <div key={index} className="bg-indigo-700 px-3 py-1 rounded-md text-base">
+        {item && typeof item === 'object' ? `(${item._type})` : String(item)}
+      </div>
+    ))}
+  </div>
+);
+
+const PairDisplay = ({ item }) => (
+    <div className="flex gap-2 items-center bg-gray-900/50 p-2 rounded-md">
+        <div className="bg-gray-700 px-3 py-1 rounded-md text-base">{item.first}</div>
+        <div className="bg-gray-700 px-3 py-1 rounded-md text-base">{item.second}</div>
+    </div>
+);
+
+const TupleDisplay = ({ item }) => (
+    <div className="flex flex-wrap gap-1 bg-gray-900/50 p-2 rounded-md">
+        {item.values.map((val, index) => (
+             <div key={index} className="bg-gray-700 px-3 py-1 rounded-md text-base">{val}</div>
+        ))}
+    </div>
+);
+
+// --- NEW: Bitset Display Component ---
+const BitsetDisplay = ({ bits }) => (
+  <div className="flex flex-wrap gap-px bg-gray-900/50 p-2 rounded-md">
+    {bits.map((bit, index) => (
+      <div key={index} className="flex flex-col items-center">
+        <div className={`w-8 h-8 flex items-center justify-center font-mono text-lg rounded-t-md ${bit === '1' ? 'bg-green-500 text-black' : 'bg-gray-700'}`}>
+            {bit}
+        </div>
+        <div className="bg-gray-600 text-xs px-2 py-0.5 rounded-b-md text-gray-400 w-full text-center">{index}</div>
+      </div>
+    ))}
+  </div>
+);
+
 
 const GridDisplay = ({ matrix }) => (
     <div className="bg-gray-900/50 p-2 rounded-md inline-block">
@@ -252,11 +295,11 @@ const GridDisplay = ({ matrix }) => (
     </div>
 );
 
-const DictDisplay = ({ items }) => (
+const DictDisplay = ({ items, isMultimap = false }) => (
     <div className="bg-gray-900/50 p-2 rounded-md space-y-2">
         {Object.entries(items).map(([key, value]) => (
             <div key={key} className="flex items-start gap-3">
-                <span className="bg-green-800/50 text-green-300 px-2 py-1 rounded font-mono flex-shrink-0">{key}:</span>
+                <span className="bg-green-800/50 text-green-300 px-2 py-1 rounded font-mono flex-shrink-0">{isMultimap ? key.split('_')[0] : key}:</span>
                 <div className="flex-grow">
                     {value && value._type === 'list' ? <ListDisplay items={value.values} /> : <span>{String(value)}</span>}
                 </div>
