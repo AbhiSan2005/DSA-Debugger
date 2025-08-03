@@ -143,6 +143,7 @@ inorder_traversal(root)
         <div className="w-full h-1/2 md:h-full md:w-1/2 flex flex-col rounded-lg shadow-2xl bg-gray-800">
           <div className="flex-shrink-0 bg-gray-700 p-2 rounded-t-lg flex justify-between items-center"><h2 className="text-lg font-semibold">Visualization</h2>
             {trace.length > 0 && !trace[0]?.error && (
+                // --- FONT FIX: Apply font-mono to the entire button ---
                 <button onClick={() => setIsStepListOpen(!isStepListOpen)} className="font-mono text-sm bg-gray-900 border border-gray-600 px-3 py-1 rounded-md flex items-center gap-2 hover:bg-gray-700 transition-colors">
                     Step 
                     <Counter 
@@ -152,7 +153,6 @@ inorder_traversal(root)
                         gradientFrom="rgba(31, 41, 55, 0)"
                         gradientTo="rgba(31, 41, 55, 0)"
                     /> 
-                    / {trace.length}
                 </button>
             )}
           </div>
