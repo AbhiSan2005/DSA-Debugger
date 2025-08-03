@@ -7,7 +7,8 @@ const os = require('os');
 const crypto = require('crypto');
 
 const app = express();
-const port = 3001;
+// --- CHANGE: Use port from environment variable for deployment ---
+const port = process.env.PORT || 3001;
 
 app.use(cors());
 app.use(express.json());
@@ -26,7 +27,7 @@ app.post('/visualize', (req, res) => {
   else { res.status(400).json({ error: 'Unsupported language specified.' }); }
 });
 
-// --- C++ Visualization Logic with GDB ---
+// --- C++ Visualization Logic (REMOVED DOCKER) ---
 function visualizeCpp(code, res) {
     const uniqueId = crypto.randomBytes(16).toString('hex');
     const tempDir = path.join(os.tmpdir(), `cpp-visualizer-${uniqueId}`);
@@ -39,7 +40,7 @@ function visualizeCpp(code, res) {
 set pagination off
 set confirm off
 set print elements 0
-file /app/main.out
+file ./main.out
 rbreak main.cpp:.
 run
 while 1
@@ -53,24 +54,14 @@ end
     const gdbScriptPath = path.join(tempDir, 'gdb_script.txt');
     fs.writeFileSync(gdbScriptPath, gdbScriptContent);
 
-    const dockerfileContent = `
-FROM ubuntu:22.04
-RUN apt-get update && apt-get install -y build-essential gdb
-WORKDIR /app
-COPY . .
-RUN g++ main.cpp -o main.out -std=c++17 -g
-    `;
-    const dockerfilePath = path.join(tempDir, 'Dockerfile');
-    fs.writeFileSync(dockerfilePath, dockerfileContent);
-    
-    const imageName = `visualizer-cpp-${uniqueId}`;
-    const command = `docker build -t ${imageName} "${tempDir}" && docker run --rm ${imageName} gdb -batch -x gdb_script.txt`;
+    // --- CHANGE: Execute g++ and gdb directly inside the container ---
+    const command = `g++ ${cppFilePath} -o ${tempDir}/main.out -std=c++17 -g && gdb -batch -x ${gdbScriptPath}`;
 
     exec(command, { timeout: 10000 }, (error, stdout, stderr) => {
         fs.rmSync(tempDir, { recursive: true, force: true });
 
         if (error && !stdout) {
-            console.error(`Docker exec error: ${error}`);
+            console.error(`Exec error: ${error}`);
             if (stderr.includes('g++:') || stderr.includes('error:')) {
                  return res.json({ trace: [{ error: `Compilation Error:\n\n${stderr}` }] });
             }
@@ -82,53 +73,31 @@ RUN g++ main.cpp -o main.out -std=c++17 -g
     });
 }
 
-// --- GDB Output Parser (REWRITTEN for Initializer Lists) ---
+// --- GDB Parser (Unchanged) ---
 function parseGdbOutput(gdbOutput) {
     let trace = [];
     const steps = gdbOutput.split('---STEP_START---');
-    
     const lineRegex = /main\.cpp:(\d+)/;
-    // --- NEW: More robust regex for parsing multi-line variable assignments ---
-    const localsRegex = /^([a-zA-Z_][\w]*) = ([\s\S]*?)(?=\n[a-zA-Z_]|\n---STEP_END---)/gm;
-    
-    const variableBlacklist = new Set([
-        'unwind_buf', 'not_first_call', 'cancel_jmp_buf', 'mask_was_saved', 
-        'priv', 'pad', 'data', 'prev', 'cleanup', 'canceltype', 'jm', 'addrs', 
-        'l', 'init_array', 'result', 'j'
-    ]);
-
+    const localsRegex = /^([a-zA-Z_][\w]*) = ([\s\S]*?)(?=\n[a-zA-Z_][\w]*\s*=|\n---STEP_END---)/gm;
+    const variableBlacklist = new Set(['unwind_buf','not_first_call','cancel_jmp_buf','mask_was_saved','priv','pad','data','prev','cleanup','canceltype','jm','addrs','l','init_array','result','j']);
     let lastLocals = {};
     let hasFoundMain = false;
-
     for (const step of steps) {
         if (!step.trim()) continue;
-
-        if (!hasFoundMain && step.includes('main () at main.cpp')) {
-            hasFoundMain = true;
-        }
-        if (!hasFoundMain) {
-            continue;
-        }
-
+        if (!hasFoundMain && step.includes('main () at main.cpp')) { hasFoundMain = true; }
+        if (!hasFoundMain) { continue; }
         const lineMatch = step.match(lineRegex);
         if (!lineMatch) continue;
-
         const line = parseInt(lineMatch[1], 10);
         const currentLocals = {};
-        
         let match;
         localsRegex.lastIndex = 0; 
         while ((match = localsRegex.exec(step)) !== null) {
             const varName = match[1];
-            if (variableBlacklist.has(varName)) {
-                continue;
-            }
-
+            if (variableBlacklist.has(varName)) { continue; }
             let value = match[2].trim().replace(/,\s*$/, "");
-            
             if (value.startsWith('std::')) {
                 const containerMatch = value.match(/{([\s\S]*)}/);
-
                 if (value.includes('stack') || value.includes('queue')) {
                     if (containerMatch) {
                         const elements = containerMatch[1].split(',').map(el => el.trim()).filter(Boolean);
@@ -141,7 +110,6 @@ function parseGdbOutput(gdbOutput) {
                 }
                 else if (containerMatch) {
                     const elements = containerMatch[1].split(',').map(el => el.trim()).filter(Boolean);
-                    
                     if (value.includes('string')) {
                         const stringMatch = value.match(/"(.*?)"/);
                         if (stringMatch) { value = { _type: 'string', value: stringMatch[1] }; }
@@ -191,47 +159,34 @@ function parseGdbOutput(gdbOutput) {
                     if (sizeMatch) {
                         const size = parseInt(sizeMatch[1], 10);
                         let bits = [];
-                        if (bitsMatch) {
-                            bits = bitsMatch[1].padStart(size, '0').split('');
-                        } else {
-                            bits = Array(size).fill('0');
-                        }
+                        if (bitsMatch) { bits = bitsMatch[1].padStart(size, '0').split(''); } 
+                        else { bits = Array(size).fill('0'); }
                         value = { _type: 'bitset', values: bits };
                     }
                 }
-            } else {
-                 value = value.replace(/<.*?>/g, '').trim();
-            }
-            
+            } else { value = value.replace(/<.*?>/g, '').trim(); }
             currentLocals[varName] = value;
         }
-
         const combinedLocals = { ...lastLocals, ...currentLocals };
         const lastStep = trace[trace.length - 1];
         const hasStateChanged = !lastStep || JSON.stringify(lastStep.locals) !== JSON.stringify(combinedLocals);
-
-        if (!lastStep || lastStep.line !== line || hasStateChanged) {
-             trace.push({
-                line,
-                event: 'line',
-                locals: combinedLocals,
-                output: '' 
-            });
-            lastLocals = combinedLocals;
+        if (hasStateChanged) {
+             trace.push({ line: (!lastStep || lastStep.line === line) ? line : lastStep.line, event: 'line', locals: combinedLocals, output: '' });
+        } else if (lastStep.line !== line) {
+             trace.push({ line, event: 'line', locals: combinedLocals, output: '' });
         }
+        lastLocals = combinedLocals;
     }
-    
-    if (gdbOutput.includes('Inferior exit')) {
-        trace.pop();
+    const finalTrace = trace.filter((step, index, arr) => {
+        if (index === 0) return true;
+        return JSON.stringify(step.locals) !== JSON.stringify(arr[index-1].locals) || step.line !== arr[index-1].line;
+    });
+    if (finalTrace.length > 0) {
+        finalTrace[finalTrace.length - 1].line = lineRegex.exec(gdbOutput)[1];
+        finalTrace.push({ ...finalTrace[finalTrace.length - 1], event: 'end' });
     }
-
-    if (trace.length > 0) {
-        trace.push({ ...trace[trace.length - 1], event: 'end' });
-    }
-
-    return trace;
+    return finalTrace;
 }
-
 
 // --- Python Visualization Logic (Unchanged) ---
 function visualizePython(code, res) {
@@ -275,7 +230,8 @@ finally: sys.stdout = original_stdout; sys.settrace(None)
 print(json.dumps({"trace": trace}))
   `;
   fs.writeFileSync(tempTracerPath, tracerScript);
-  const pythonProcess = spawn('python', [tempTracerPath]);
+  // --- CHANGE: Use python3 command ---
+  const pythonProcess = spawn('python3', [tempTracerPath]);
   let output = '';
   let errorOutput = '';
   pythonProcess.stdout.on('data', (data) => { output += data.toString(); });
