@@ -11,12 +11,7 @@ import Dock from './components/Dock';
 export default function App() {
   const [language, setLanguage] = useState('cpp');
   const [code, setCode] = useState(
-`#include <iostream>
-
-int main() {
-    // Start coding here!
-    return 0;
-}
+`Start coding here!
 `
   );
   const [trace, setTrace] = useState([]);
