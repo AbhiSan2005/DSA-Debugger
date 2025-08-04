@@ -1,4 +1,4 @@
-# DSA Visualizer: A Step-by-Step Code Execution Tool
+# DSA Debugger: A Step-by-Step Code Execution Tool
 
 Welcome to the **DSA Visualizer**, an interactive web application designed to help you understand how your code executes, line by line. Built with **React** and **Node.js**, this tool provides a clear, visual representation of your algorithms—making it easier to learn, debug, and master complex data structures in both **Python** and **C++**.
 
@@ -58,7 +58,7 @@ Make sure you have the following installed:
 
 ```bash
 # 1. Clone the repository (if not already done)
-git clone <https://github.com/AbhiSan2005/DSA-Debugger>
+git clone https://github.com/AbhiSan2005/DSA-Debugger
 
 # 2. Navigate to the backend directory
 cd debugger-app/server
