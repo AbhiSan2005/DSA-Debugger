@@ -2,12 +2,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 import { Rewind, SkipBack, SkipForward, FastForward, Play, Pause } from 'lucide-react';
 
+// --- Import New Components ---
 import AnimatedList from './components/AnimatedList';
 import Counter from './components/Counter';
 import Dock from './components/Dock';
-
-// --- CHANGE: Use environment variable for API URL ---
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 // --- Main App Component ---
 export default function App() {
@@ -75,8 +73,7 @@ int main() {
     if (!editorRef.current) { setIsLoading(false); return; }
     const sourceCode = editorRef.current.getValue();
     try {
-      // --- CHANGE: Use the API_URL variable ---
-      const response = await fetch(`${API_URL}/visualize`, {
+      const response = await fetch('http://localhost:3001/visualize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: sourceCode, language }),
@@ -209,7 +206,7 @@ const VariableDisplay = ({ name, value }) => {
       case 'priority_queue': return <ListDisplay items={val.values} />;
       case 'pair': return <PairDisplay item={val} />;
       case 'tuple': return <TupleDisplay item={val} />;
-      case 'bitset': return <BitsetDisplay bits={val.values} />;
+      case 'bitset': return <BitsetDisplay bits={val.values} />; // --- NEW CASE ---
       case 'dict': return <DictDisplay items={val.values} />;
       case 'function': return <FunctionDisplay func={val} />;
       case 'tree_node': return <div className="overflow-x-auto p-1"><TreeDisplay node={val} /></div>;
@@ -223,15 +220,137 @@ const VariableDisplay = ({ name, value }) => {
 };
 
 // --- Data Structure Specific Components ---
-const StringDisplay = ({ str }) => ( <div className="bg-gray-700 p-2 rounded-md text-lg font-mono text-amber-300"> "{str.value}" </div> );
-const ListDisplay = ({ items }) => ( <div className="flex flex-wrap gap-1 bg-gray-900/50 p-2 rounded-md"> {items.map((item, index) => ( <div key={index} className="flex flex-col items-center"> <div className="bg-gray-700 px-3 py-1 rounded-t-md text-base">{item && typeof item === 'object' ? `(${item._type})` : String(item)}</div> <div className="bg-gray-600 text-xs px-3 py-0.5 rounded-b-md text-gray-400">{index}</div> </div> ))} </div> );
-const SetDisplay = ({ items }) => ( <div className="flex flex-wrap gap-2 bg-gray-900/50 p-2 rounded-md"> {items.map((item, index) => ( <div key={index} className="bg-indigo-700 px-3 py-1 rounded-md text-base"> {item && typeof item === 'object' ? `(${item._type})` : String(item)} </div> ))} </div> );
-const PairDisplay = ({ item }) => ( <div className="flex gap-2 items-center bg-gray-900/50 p-2 rounded-md"> <div className="bg-gray-700 px-3 py-1 rounded-md text-base">{item.first}</div> <div className="bg-gray-700 px-3 py-1 rounded-md text-base">{item.second}</div> </div> );
-const TupleDisplay = ({ item }) => ( <div className="flex flex-wrap gap-1 bg-gray-900/50 p-2 rounded-md"> {item.values.map((val, index) => ( <div key={index} className="bg-gray-700 px-3 py-1 rounded-md text-base">{val}</div> ))} </div> );
-const BitsetDisplay = ({ bits }) => ( <div className="flex flex-wrap gap-px bg-gray-900/50 p-2 rounded-md"> {bits.map((bit, index) => ( <div key={index} className="flex flex-col items-center"> <div className={`w-8 h-8 flex items-center justify-center font-mono text-lg rounded-t-md ${bit === '1' ? 'bg-green-500 text-black' : 'bg-gray-700'}`}> {bit} </div> <div className="bg-gray-600 text-xs px-2 py-0.5 rounded-b-md text-gray-400 w-full text-center">{index}</div> </div> ))} </div> );
-const GridDisplay = ({ matrix }) => ( <div className="bg-gray-900/50 p-2 rounded-md inline-block"> <table className="border-collapse"> <tbody> {matrix.map((row, rowIndex) => ( <tr key={rowIndex}> {row.values.map((cell, colIndex) => ( <td key={colIndex} className="border border-gray-600 p-2 text-center font-mono"> {cell && typeof cell === 'object' ? '...' : String(cell)} </td> ))} </tr> ))} </tbody> </table> </div> );
-const DictDisplay = ({ items, isMultimap = false }) => ( <div className="bg-gray-900/50 p-2 rounded-md space-y-2"> {Object.entries(items).map(([key, value]) => ( <div key={key} className="flex items-start gap-3"> <span className="bg-green-800/50 text-green-300 px-2 py-1 rounded font-mono flex-shrink-0">{isMultimap ? key.split('_')[0] : key}:</span> <div className="flex-grow"> {value && value._type === 'list' ? <ListDisplay items={value.values} /> : <span>{String(value)}</span>} </div> </div> ))} </div> );
-const ObjectDisplay = ({ obj }) => ( <div className="bg-gray-900/50 p-3 rounded-md border border-gray-700"> <p className="text-sm text-gray-400 mb-2 font-semibold">{obj.class_name}</p> <div className="space-y-1"> {Object.entries(obj.attributes).map(([key, value]) => ( <div key={key} className="flex items-center gap-2 text-sm"> <span className="text-purple-400">{key}:</span> <span>{value && typeof value === 'object' ? `(${value._type || 'obj'})` : String(value)}</span> </div> ))} </div> </div> );
-const FunctionDisplay = ({ func }) => ( <div className="bg-gray-900/50 p-3 rounded-md border border-gray-700"> <p className="text-sm text-gray-400 font-mono"><span className="text-indigo-400">function</span> {func.name}()</p> </div> );
-const LinkedListDisplay = ({ node }) => ( <div className="flex items-center gap-0"> <div className="bg-sky-700 p-2 md:p-3 rounded-l-md font-mono text-sm md:text-base">{String(node.attributes.val)}</div> <div className="bg-sky-800 p-2 md:p-3 rounded-r-md text-sky-300">&rarr;</div> {node.attributes.next ? <LinkedListDisplay node={node.attributes.next} /> : <div className="bg-gray-700 p-2 md:p-3 rounded-md font-mono text-xs md:text-sm">None</div>} </div> );
-const TreeDisplay = ({ node }) => { if (!node || node._type !== 'tree_node') return null; return ( <div className="flex flex-col items-center p-2 bg-gray-800/50 rounded-lg border border-gray-700"> <div className="bg-teal-600 w-10 h-10 md:w-12 md:h-12 flex items-center justify-center rounded-full font-bold text-base md:text-lg mb-2">{String(node.attributes.val)}</div> <div className="flex gap-2 md:gap-4"> <div className="flex flex-col items-center"> <p className="text-xs text-gray-500">left</p> {node.attributes.left ? <TreeDisplay node={node.attributes.left} /> : <div className="text-gray-600 font-mono text-xs md:text-sm p-2">None</div>} </div> <div className="flex flex-col items-center"> <p className="text-xs text-gray-500">right</p> {node.attributes.right ? <TreeDisplay node={node.attributes.right} /> : <div className="text-gray-600 font-mono text-xs md:text-sm p-2">None</div>} </div> </div> </div> ); };
+const StringDisplay = ({ str }) => (
+    <div className="bg-gray-700 p-2 rounded-md text-lg font-mono text-amber-300">
+        "{str.value}"
+    </div>
+);
+
+const ListDisplay = ({ items }) => (
+  <div className="flex flex-wrap gap-1 bg-gray-900/50 p-2 rounded-md">
+    {items.map((item, index) => (
+      <div key={index} className="flex flex-col items-center">
+        <div className="bg-gray-700 px-3 py-1 rounded-t-md text-base">{item && typeof item === 'object' ? `(${item._type})` : String(item)}</div>
+        <div className="bg-gray-600 text-xs px-3 py-0.5 rounded-b-md text-gray-400">{index}</div>
+      </div>
+    ))}
+  </div>
+);
+
+const SetDisplay = ({ items, isMultiset = false }) => (
+  <div className="flex flex-wrap gap-2 bg-gray-900/50 p-2 rounded-md">
+    {items.map((item, index) => (
+      <div key={index} className="bg-indigo-700 px-3 py-1 rounded-md text-base">
+        {item && typeof item === 'object' ? `(${item._type})` : String(item)}
+      </div>
+    ))}
+  </div>
+);
+
+const PairDisplay = ({ item }) => (
+    <div className="flex gap-2 items-center bg-gray-900/50 p-2 rounded-md">
+        <div className="bg-gray-700 px-3 py-1 rounded-md text-base">{item.first}</div>
+        <div className="bg-gray-700 px-3 py-1 rounded-md text-base">{item.second}</div>
+    </div>
+);
+
+const TupleDisplay = ({ item }) => (
+    <div className="flex flex-wrap gap-1 bg-gray-900/50 p-2 rounded-md">
+        {item.values.map((val, index) => (
+             <div key={index} className="bg-gray-700 px-3 py-1 rounded-md text-base">{val}</div>
+        ))}
+    </div>
+);
+
+// --- NEW: Bitset Display Component ---
+const BitsetDisplay = ({ bits }) => (
+  <div className="flex flex-wrap gap-px bg-gray-900/50 p-2 rounded-md">
+    {bits.map((bit, index) => (
+      <div key={index} className="flex flex-col items-center">
+        <div className={`w-8 h-8 flex items-center justify-center font-mono text-lg rounded-t-md ${bit === '1' ? 'bg-green-500 text-black' : 'bg-gray-700'}`}>
+            {bit}
+        </div>
+        <div className="bg-gray-600 text-xs px-2 py-0.5 rounded-b-md text-gray-400 w-full text-center">{index}</div>
+      </div>
+    ))}
+  </div>
+);
+
+
+const GridDisplay = ({ matrix }) => (
+    <div className="bg-gray-900/50 p-2 rounded-md inline-block">
+        <table className="border-collapse">
+            <tbody>
+                {matrix.map((row, rowIndex) => (
+                    <tr key={rowIndex}>
+                        {row.values.map((cell, colIndex) => (
+                            <td key={colIndex} className="border border-gray-600 p-2 text-center font-mono">
+                                {cell && typeof cell === 'object' ? '...' : String(cell)}
+                            </td>
+                        ))}
+                    </tr>
+                ))}
+            </tbody>
+        </table>
+    </div>
+);
+
+const DictDisplay = ({ items, isMultimap = false }) => (
+    <div className="bg-gray-900/50 p-2 rounded-md space-y-2">
+        {Object.entries(items).map(([key, value]) => (
+            <div key={key} className="flex items-start gap-3">
+                <span className="bg-green-800/50 text-green-300 px-2 py-1 rounded font-mono flex-shrink-0">{isMultimap ? key.split('_')[0] : key}:</span>
+                <div className="flex-grow">
+                    {value && value._type === 'list' ? <ListDisplay items={value.values} /> : <span>{String(value)}</span>}
+                </div>
+            </div>
+        ))}
+    </div>
+);
+
+const ObjectDisplay = ({ obj }) => (
+    <div className="bg-gray-900/50 p-3 rounded-md border border-gray-700">
+        <p className="text-sm text-gray-400 mb-2 font-semibold">{obj.class_name}</p>
+        <div className="space-y-1">
+            {Object.entries(obj.attributes).map(([key, value]) => (
+                <div key={key} className="flex items-center gap-2 text-sm">
+                    <span className="text-purple-400">{key}:</span>
+                    <span>{value && typeof value === 'object' ? `(${value._type || 'obj'})` : String(value)}</span>
+                </div>
+            ))}
+        </div>
+    </div>
+);
+
+const FunctionDisplay = ({ func }) => (
+    <div className="bg-gray-900/50 p-3 rounded-md border border-gray-700">
+        <p className="text-sm text-gray-400 font-mono"><span className="text-indigo-400">function</span> {func.name}()</p>
+    </div>
+);
+
+const LinkedListDisplay = ({ node }) => (
+    <div className="flex items-center gap-0">
+        <div className="bg-sky-700 p-2 md:p-3 rounded-l-md font-mono text-sm md:text-base">{String(node.attributes.val)}</div>
+        <div className="bg-sky-800 p-2 md:p-3 rounded-r-md text-sky-300">&rarr;</div>
+        {node.attributes.next ? <LinkedListDisplay node={node.attributes.next} /> : <div className="bg-gray-700 p-2 md:p-3 rounded-md font-mono text-xs md:text-sm">None</div>}
+    </div>
+);
+
+const TreeDisplay = ({ node }) => {
+    if (!node || node._type !== 'tree_node') return null;
+    return (
+        <div className="flex flex-col items-center p-2 bg-gray-800/50 rounded-lg border border-gray-700">
+            <div className="bg-teal-600 w-10 h-10 md:w-12 md:h-12 flex items-center justify-center rounded-full font-bold text-base md:text-lg mb-2">{String(node.attributes.val)}</div>
+            <div className="flex gap-2 md:gap-4">
+                <div className="flex flex-col items-center">
+                    <p className="text-xs text-gray-500">left</p>
+                    {node.attributes.left ? <TreeDisplay node={node.attributes.left} /> : <div className="text-gray-600 font-mono text-xs md:text-sm p-2">None</div>}
+                </div>
+                 <div className="flex flex-col items-center">
+                    <p className="text-xs text-gray-500">right</p>
+                    {node.attributes.right ? <TreeDisplay node={node.attributes.right} /> : <div className="text-gray-600 font-mono text-xs md:text-sm p-2">None</div>}
+                </div>
+            </div>
+        </div>
+    );
+};
